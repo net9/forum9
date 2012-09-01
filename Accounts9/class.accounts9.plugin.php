@@ -71,7 +71,7 @@ class Accounts9Plugin extends Gdn_Plugin {
 //                'SignInHtml' => "<a id=\"Accounts9\" href=\"$SigninHref\" class=\"PopLink\" ><img src=\"$ImgSrc\" alt=\"$ImgAlt\" /></a>");
 //         } else {
             $SigninHref = $this->AuthorizeUri();
-            $PopupSigninHref = $this->AuthorizeUri('display=popup');
+//            $PopupSigninHref = $this->AuthorizeUri('display=popup');
 
             // Add the accounts9 method to the controller.
             $Accounts9Method = array(
@@ -105,7 +105,7 @@ class Accounts9Plugin extends Gdn_Plugin {
       $ImgSrc = Asset('/plugins/Accounts9/design/accounts9-icon.png');
       $ImgAlt = T('Login with Accounts9');
       $SigninHref = $this->AuthorizeUri();
-      $PopupSigninHref = $this->AuthorizeUri('display=popup');
+//     $PopupSigninHref = $this->AuthorizeUri('display=popup');
       return "<a id=\"Accounts9Auth\" href=\"$SigninHref\" class=\"PopupWindow\" title=\"$ImgAlt\" popupHref=\"$PopupSigninHref\" popupHeight=\"326\" popupWidth=\"627\" ><img src=\"$ImgSrc\" alt=\"$ImgAlt\" align=\"bottom\" /></a>";
    }
 	
@@ -144,17 +144,23 @@ class Accounts9Plugin extends Gdn_Plugin {
 
       $AppID = C('Plugins.Accounts9.ApplicationID');
       $Secret = C('Plugins.Accounts9.Secret');
+      if(!$Code){
+	      if(!isset($_GET['code']))
+		      throw new Gdn_UserException('could not retrieve code out of callback request and no code given');
+	      $Code=$_GET['code'];
+      }
       $Code = GetValue('code', $_GET);
-      $Query = '';
+ /*     $Query = '';
       if ($Sender->Request->Get('display'))
          $Query = 'display='.urlencode($Sender->Request->Get('display'));
-
+  */
       $RedirectUri = ConcatSep('&', $this->RedirectUri(), $Query);
       $RedirectUri = urlencode($RedirectUri);
 
       // Get the access token.
       if ($Code || !($AccessToken = $this->AccessToken())) {
          // Exchange the token for an access token.
+
          $Code = urlencode($Code);
 
          $Url = "https://accounts.net9.org/api/access_token?client_id=$AppID&client_secret=$Secret&code=$Code&redirect_uri=$RedirectUri";
@@ -167,18 +173,18 @@ class Accounts9Plugin extends Gdn_Plugin {
          $Contents = curl_exec($C);
 //         $Contents = ProxyRequest($Url);
          $Info = curl_getinfo($C);
-         if (strpos(GetValue('content_type', $Info, ''), '/javascript') !== FALSE) {
-            $Tokens = json_decode($Contents, TRUE);
-         } else {
+//        if (strpos(GetValue('content_type', $Info, ''), '/javascript') !== FALSE) {
+         $Tokens = json_decode($Contents, TRUE);
+        /* } else {
             parse_str($Contents, $Tokens);
-         }
+	 }*/
 
          if (GetValue('error', $Tokens)) {
             throw new Gdn_UserException('Accounts9 returned the following error: '.GetValueR('error.message', $Tokens, 'Unknown error.'), 400);
          }
 
          $AccessToken = GetValue('access_token', $Tokens);
-         $Expires = GetValue('expires', $Tokens, NULL);
+         $Expires = GetValue('expires_in', $Tokens, NULL);
 
          setcookie('accounts9_access_token', $AccessToken, time() + $Expires, C('Garden.Cookie.Path', '/'), C('Garden.Cookie.Domain', ''));
          $NewToken = TRUE;
@@ -186,7 +192,7 @@ class Accounts9Plugin extends Gdn_Plugin {
 
       // Get the profile.
       try {
-	      $Profile = $this->GetProfile($AccessToken);
+      	$Profile = $this->GetProfile($AccessToken);
       } catch (Exception $Ex) {
          if (!isset($NewToken)) {
             // There was an error getting the profile, which probably means the saved access token is no longer valid. Try and reauthorize.
@@ -201,13 +207,18 @@ class Accounts9Plugin extends Gdn_Plugin {
             $Sender->Form->AddError('There was an error with the Accounts9 connection.');
          }
       }
+	//throw new Gdn_UserException($Profile);
 
-      $User = GetValue("userinfo",$Profile);
+      $User = GetValue("user",$Profile);
+//      throw new Gdn_UserException($User['uid']);
+//      $User = json_decode($UContents,TRUE);
       $Form = $Sender->Form; //new Gdn_Form();
       $ID = GetValue('uid', $User);
       $Form->SetFormValue('UniqueID', $ID);
       $Form->SetFormValue('Provider', 'accounts9');
       $Form->SetFormValue('ProviderName', 'Accounts9');
+      $Form->SetFormValue('Name',GetValue('name',$User));
+      $Form->SetFormValue('NickName',GetValue('nickname',$User));
       $Form->SetFormValue('FullName', GetValue('username', $User));
       $Form->SetFormValue('Email', GetValue('email', $User));
 //      $Form->SetFormValue('Photo', "http://graph.facebook.com/$ID/picture");
@@ -215,14 +226,14 @@ class Accounts9Plugin extends Gdn_Plugin {
    }
 
    public function GetProfile($AccessToken) {
-	   $Url = "https://https://accounts.net9.org/api/userinfo?access_token=$AccessToken";
-//      $C = curl_init();
-//      curl_setopt($C, CURLOPT_RETURNTRANSFER, TRUE);
-//      curl_setopt($C, CURLOPT_SSL_VERIFYPEER, FALSE);
-//      curl_setopt($C, CURLOPT_URL, $Url);
-//      $Contents = curl_exec($C);
+	   $Url = "https://accounts.net9.org/api/userinfo?access_token=$AccessToken";
+  //    $C = curl_init();
+  //    curl_setopt($C, CURLOPT_RETURNTRANSFER, TRUE);
+  //    curl_setopt($C, CURLOPT_SSL_VERIFYPEER, FALSE);
+  //    curl_setopt($C, CURLOPT_URL, $Url);
+ //     $Contents = curl_exec($C);
 //      $Contents = ProxyRequest($Url);
-      $Contents = file_get_contents($Url);
+	$Contents = file_get_contents($Url);
       $Profile = json_decode($Contents, TRUE);
       return $Profile;
    }
@@ -235,7 +246,7 @@ class Accounts9Plugin extends Gdn_Plugin {
          $RedirectUri .= '&'.$Query;
       $RedirectUri = urlencode($RedirectUri);
 
-      $SigninHref = "https://accounts.net9.org/api/authorize?client_id=$AppID&redirect_uri=$RedirectUri&scope=email,publish_stream";
+      $SigninHref = "https://accounts.net9.org/api/authorize?client_id=$AppID&redirect_uri=$RedirectUri";//&scope=email,publish_stream";
       if ($Query)
          $SigninHref .= '&'.$Query;
       return $SigninHref;
@@ -247,8 +258,8 @@ class Accounts9Plugin extends Gdn_Plugin {
       if ($NewValue !== NULL)
          $this->_RedirectUri = $NewValue;
       elseif ($this->_RedirectUri === NULL) {
-         $RedirectUri = Url('/entry/connect/', TRUE);
-         if (strpos($RedirectUri, '=') !== FALSE) {
+         $RedirectUri = Url('/entry/connect/accounts9', TRUE);
+         /*if (strpos($RedirectUri, '=') !== FALSE) {
             $p = strrchr($RedirectUri, '=');
             $Uri = substr($RedirectUri, 0, -strlen($p));
             $p = urlencode(ltrim($p, '='));
@@ -263,8 +274,8 @@ class Accounts9Plugin extends Gdn_Plugin {
          $Args = array('Target' => $Target);
 
 
-         $RedirectUri .= strpos($RedirectUri, '?') === FALSE ? '?' : '&';
-         $RedirectUri .= http_build_query($Args);
+	 $RedirectUri .= strpos($RedirectUri, '?') === FALSE ? '?' : '&';*/
+	 //         $RedirectUri .= http_build_query($Args);
          $this->_RedirectUri = $RedirectUri;
       }
       
