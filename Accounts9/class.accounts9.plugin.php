@@ -79,7 +79,7 @@ class Accounts9Plugin extends Gdn_Plugin {
                'SignInHtml' => "<a id=\"Accounts9Auth\" href=\"$SigninHref\" class=\"PopupWindow\" popupHref=\"$PopupSigninHref\" popupHeight=\"326\" popupWidth=\"627\" ><img src=\"$ImgSrc\" alt=\"$ImgAlt\" /></a>");
 //         }
 
-         $Sender->Data['Methods'][] = $FbMethod;
+         $Sender->Data['Methods'][] = $Accounts9Method;
       }
    }
 
@@ -186,7 +186,7 @@ class Accounts9Plugin extends Gdn_Plugin {
 
       // Get the profile.
       try {
-         $Profile = $this->GetProfile($AccessToken);
+	      $Profile = $this->GetProfile($AccessToken);
       } catch (Exception $Ex) {
          if (!isset($NewToken)) {
             // There was an error getting the profile, which probably means the saved access token is no longer valid. Try and reauthorize.
@@ -202,19 +202,20 @@ class Accounts9Plugin extends Gdn_Plugin {
          }
       }
 
+      $User = GetValue("userinfo",$Profile);
       $Form = $Sender->Form; //new Gdn_Form();
-      $ID = GetValue('id', $Profile);
+      $ID = GetValue('uid', $User);
       $Form->SetFormValue('UniqueID', $ID);
       $Form->SetFormValue('Provider', 'accounts9');
       $Form->SetFormValue('ProviderName', 'Accounts9');
-      $Form->SetFormValue('FullName', GetValue('name', $Profile));
-      $Form->SetFormValue('Email', GetValue('email', $Profile));
-      $Form->SetFormValue('Photo', "http://graph.facebook.com/$ID/picture");
+      $Form->SetFormValue('FullName', GetValue('username', $User));
+      $Form->SetFormValue('Email', GetValue('email', $User));
+//      $Form->SetFormValue('Photo', "http://graph.facebook.com/$ID/picture");
       $Sender->SetData('Verified', TRUE);
    }
 
    public function GetProfile($AccessToken) {
-      $Url = "https://https://accounts.net9.org/api/userinfo?access_token=$AccessToken";
+	   $Url = "https://https://accounts.net9.org/api/userinfo?access_token=$AccessToken";
 //      $C = curl_init();
 //      curl_setopt($C, CURLOPT_RETURNTRANSFER, TRUE);
 //      curl_setopt($C, CURLOPT_SSL_VERIFYPEER, FALSE);
@@ -246,7 +247,7 @@ class Accounts9Plugin extends Gdn_Plugin {
       if ($NewValue !== NULL)
          $this->_RedirectUri = $NewValue;
       elseif ($this->_RedirectUri === NULL) {
-         $RedirectUri = Url('/entry/connect/facebook', TRUE);
+         $RedirectUri = Url('/entry/connect/', TRUE);
          if (strpos($RedirectUri, '=') !== FALSE) {
             $p = strrchr($RedirectUri, '=');
             $Uri = substr($RedirectUri, 0, -strlen($p));
